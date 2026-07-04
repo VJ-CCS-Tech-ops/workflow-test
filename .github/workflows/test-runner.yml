@@ -1,0 +1,44 @@
+name: Test Self-Hosted Runner
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  test:
+    runs-on: self-hosted
+    steps:
+      - name: Basic connectivity check
+        run: |
+          echo "Runner is alive"
+          hostname
+          whoami
+          date
+
+      - name: Check resources
+        run: |
+          echo "--- Memory ---"
+          free -h
+          echo "--- Disk ---"
+          df -h
+          echo "--- CPU ---"
+          nproc
+          uptime
+
+      - name: Check network to GitHub
+        run: |
+          curl -sSf https://api.github.com > /dev/null && echo "GitHub API reachable"
+          curl -sSf https://pipelines.actions.githubusercontent.com > /dev/null && echo "Actions pipeline endpoint reachable"
+
+      - name: Check kubectl access to cluster
+        run: |
+          kubectl get nodes
+          kubectl get pods -A
+
+      - name: Simulate load (sleep, no heavy work)
+        run: |
+          echo "Sleeping 60s to test for drops under idle load..."
+          sleep 60
+          echo "Still alive after 60s"
+
+      - name: Checkout repo (sanity check)
+        uses:
