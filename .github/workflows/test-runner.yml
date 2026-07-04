@@ -41,4 +41,7 @@ jobs:
           echo "Still alive after 60s"
 
       - name: Checkout repo (sanity check)
-        uses:
+        uses: actions/checkout@v4
+
+      - name: Confirm checkout worked
+        run: ls -la
