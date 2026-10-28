@@ -1,50 +1,54 @@
-name: Test Self-Hosted Runner
+name: Cortex CLI Code Scan
 
 on:
   push:
     branches:
       - main
+      - test
+  workflow_dispatch:
 
 jobs:
-  test:
-    runs-on: self-hosted
+  cortex-code-scan:
+    runs-on: ubuntu-latest
+    environment: testing
+
+    env:
+      CORTEX_API_KEY: ${{secrets.CORTEX_API_KEY}}
+      CORTEX_API_KEY_ID: ${{secrets.CORTEX_API_KEY_ID}}
+      CORTEX_API_URL: https://api-ocd-xsiam-lab-demo.xdr.de.paloaltonetworks.com
+
     steps:
-      - name: Basic connectivity check
-        run: |
-          echo "Runner is alive"
-          hostname
-          whoami
-          date
+    - name: Checkout Repository
+      uses: actions/checkout@v2
 
-      - name: Check resources
-        run: |
-          echo "--- Memory ---"
-          free -h
-          echo "--- Disk ---"
-          df -h
-          echo "--- CPU ---"
-          nproc
-          uptime
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 22
 
-      - name: Check network to GitHub
-        run: |
-          curl -sSf https://api.github.com > /dev/null && echo "GitHub API reachable"
-          curl -sSf https://pipelines.actions.githubusercontent.com > /dev/null && echo "Actions pipeline endpoint reachable"
+    - name: Verify Node.js Version
+      run: node -v
 
-      - name: Check kubectl access to cluster
-        run: |
-          kubectl get nodes
-          kubectl get namespaces
-          kubectl get pods -A
+    - name: Download cortexcli
+      run: |
+        set -x
+        crtx_resp=$(curl "${CORTEX_API_URL}/public_api/v1/unified-cli/releases/download-link?os=linux&architecture=amd64" \
+          -H "x-xdr-auth-id: ${CORTEX_API_KEY_ID}" \
+          -H "Authorization: ${CORTEX_API_KEY}")
+        crtx_url=$(echo $crtx_resp | jq -r ".signed_url")
+        curl -o cortexcli $crtx_url
+        chmod +x cortexcli
+        ./cortexcli --version
 
-      - name: Simulate load (sleep, no heavy work)
-        run: |
-          echo "Sleeping 60s to test for drops under idle load..."
-          sleep 60
-          echo "Still alive after 60s"
-
-      - name: Checkout repo (sanity check)
-        uses: actions/checkout@v4
-
-      - name: Confirm checkout worked
-        run: ls -la
+    - name: Run Cortex CLI Code Scan
+      run: |
+        ./cortexcli \
+          --api-base-url "${CORTEX_API_URL}" \
+          --api-key "${CORTEX_API_KEY}" \
+          --api-key-id "${CORTEX_API_KEY_ID}" \
+          code scan \
+          --directory "${{github.workspace}}" \
+          --repo-id "${{github.repository}}" \
+          --branch "${{github.ref_name}}" \
+          --source "GITHUB_ACTIONS" \
+          --repo-url "${{github.server_url}}/${{github.repository}}"
