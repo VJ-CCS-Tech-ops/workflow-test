@@ -34,7 +34,6 @@ jobs:
       - name: Check kubectl access to cluster
         run: |
           kubectl get nodes
-          kubectl get namespaces
           kubectl get pods -A
 
       - name: Simulate load (sleep, no heavy work)
